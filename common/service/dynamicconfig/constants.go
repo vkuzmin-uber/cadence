@@ -90,6 +90,8 @@ var keys = map[Key]string{
 	MatchingMaxTaskBatchSize:                "matching.maxTaskBatchSize",
 
 	// history settings
+	// TODO remove after DC migration is over
+	EnableDCMigration:                                     "history.enableDCMigration",
 	HistoryRPS:                                            "history.rps",
 	HistoryPersistenceMaxQPS:                              "history.persistenceMaxQPS",
 	HistoryVisibilityOpenMaxQPS:                           "history.historyVisibilityOpenMaxQPS",
@@ -265,6 +267,9 @@ const (
 
 	// key for history
 
+	// EnableDCMigration whether DC migration is enabled or not
+	// TODO remove after DC migration is over
+	EnableDCMigration
 	// HistoryRPS is request rate per second for each history host
 	HistoryRPS
 	// HistoryPersistenceMaxQPS is the max qps history host can query DB

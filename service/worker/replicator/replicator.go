@@ -61,6 +61,7 @@ type (
 
 	// Config contains all the replication config for worker
 	Config struct {
+		EnableDCMigration                  dynamicconfig.BoolPropertyFn
 		PersistenceMaxQPS                  dynamicconfig.IntPropertyFn
 		ReplicatorConcurrency              dynamicconfig.IntPropertyFn
 		ReplicatorActivityBufferRetryCount dynamicconfig.IntPropertyFn
@@ -101,6 +102,9 @@ func (r *Replicator) Start() error {
 	currentClusterName := r.clusterMetadata.GetCurrentClusterName()
 	for cluster := range r.clusterMetadata.GetAllClusterFailoverVersions() {
 		if cluster != currentClusterName {
+			if r.clusterMetadata.IsClusterDisabled(cluster) {
+				continue
+			}
 			consumerName := getConsumerName(currentClusterName, cluster)
 			adminClient := admin.NewRetryableClient(
 				r.clientBean.GetRemoteAdminClient(cluster),

@@ -432,6 +432,10 @@ RetryLoop:
 		return err
 	}
 
+	if p.config.EnableDCMigration() {
+		return nil
+	}
+
 	p.metricsClient.IncCounter(metrics.HistoryRereplicationByActivityReplicationScope, metrics.CadenceClientRequests)
 	stopwatch := p.metricsClient.StartTimer(metrics.HistoryRereplicationByActivityReplicationScope, metrics.CadenceClientLatency)
 	defer stopwatch.Stop()
@@ -465,7 +469,7 @@ Loop:
 			break Loop
 		}
 	}
-	if !processTask {
+	if !processTask && !p.config.EnableDCMigration() {
 		logger.Warn("Dropping non-targeted history task.")
 		return nil
 	}
@@ -490,11 +494,20 @@ Loop:
 		ResetWorkflow:           attr.ResetWorkflow,
 	}
 
+	doLocking := p.config.EnableDCMigration() && !processTask
 RetryLoop:
 	for i := 0; i < p.config.ReplicatorHistoryBufferRetryCount(); i++ {
+		if doLocking {
+			workflowIdendifier := definition.NewWorkflowIdentifier(attr.GetDomainId(), attr.GetWorkflowId(), "")
+			p.rereplicationLock.LockID(workflowIdendifier)
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), replicationTimeout)
 		err = p.historyClient.ReplicateEvents(ctx, req)
 		cancel()
+		if doLocking {
+			workflowIdendifier := definition.NewWorkflowIdentifier(attr.GetDomainId(), attr.GetWorkflowId(), "")
+			p.rereplicationLock.UnlockID(workflowIdendifier)
+		}
 
 		// Replication tasks could be slightly out of order for a particular workflow execution
 		// We first try to apply the events without buffering enabled with a small delay to account for such delays
@@ -538,6 +551,11 @@ RetryLoop:
 		logger.WithField(logging.TagErr, resendErr).Error("error resend history")
 	}
 	// should return the replication error, not the resending error
+
+	// TODO uncomment this test once DC migration is done
+	if !processTask && req.GetForceBufferEvents() {
+		return nil
+	}
 	return err
 }
 
